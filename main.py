@@ -7,7 +7,7 @@ from typing import List
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
+from aiogram.enums import ParseMode, ChatType
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -45,11 +45,9 @@ POST_TEMPLATE = """
 💱 <b>10000¥+</b> ➡️ <b>{rate_10000}</b>₽
 💱 <b>25000¥+</b> ➡️ <b>{rate_25000}</b>₽
 
-💵 Для оплаты в <b>USDT</b> уточните курс в лс
+💵 Для оплаты в <b>USDT</b> уточните курс
 
 🏦 Принимаем рубли с любого банка России
-
-✅Перевод на Alipay, Wechat,  оплата поставщику напрямую поставщикам
 
 📝 Отзывы: @reviews_lilei
 
@@ -102,6 +100,10 @@ router = Router()
 
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
+
+
+def is_private_chat(message: Message) -> bool:
+    return message.chat.type == ChatType.PRIVATE
 
 
 def validate_date(date_text: str) -> str:
@@ -160,6 +162,9 @@ def build_post(post_date: str, rates: List[str]) -> str:
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext) -> None:
+    if not is_private_chat(message):
+        return
+
     await state.clear()
 
     if not is_admin(message.from_user.id):
@@ -175,6 +180,9 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
 
 @router.message(F.text == "Опубликовать курс")
 async def publish_rate_start(message: Message, state: FSMContext) -> None:
+    if not is_private_chat(message):
+        return
+
     if not is_admin(message.from_user.id):
         await message.answer("У тебя нет доступа к этому действию.")
         return
@@ -188,6 +196,9 @@ async def publish_rate_start(message: Message, state: FSMContext) -> None:
 
 @router.message(PublishRateState.waiting_for_date)
 async def process_post_date(message: Message, state: FSMContext) -> None:
+    if not is_private_chat(message):
+        return
+
     if not is_admin(message.from_user.id):
         await message.answer("У тебя нет доступа к этому действию.")
         await state.clear()
@@ -216,6 +227,9 @@ async def process_post_date(message: Message, state: FSMContext) -> None:
 
 @router.message(PublishRateState.waiting_for_rates)
 async def process_rates(message: Message, state: FSMContext, bot: Bot) -> None:
+    if not is_private_chat(message):
+        return
+
     if not is_admin(message.from_user.id):
         await message.answer("У тебя нет доступа к этому действию.")
         await state.clear()
@@ -273,8 +287,10 @@ async def process_rates(message: Message, state: FSMContext, bot: Bot) -> None:
 
 @router.message()
 async def fallback_handler(message: Message) -> None:
+    if not is_private_chat(message):
+        return
+
     if not is_admin(message.from_user.id):
-        await message.answer("У тебя нет доступа к этому боту.")
         return
 
     await message.answer(
